@@ -2,14 +2,15 @@
 const WebSocket = require("ws").WebSocket;
 const protobuf = require("protobufjs");
 const axios = require("axios");
+const {buyingAlgo} = require('../v3/buyingStock')
 
 // Initialize global variables
 let protobufRoot = null;
-const accessToken = "ACCESS_TOKEN"; // Replace "ACCESS_TOKEN" with your actual token
+const accessToken = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiIzNkFXR0giLCJqdGkiOiI2N2RiOWNjOWM1MGY4MTU4NjhjOTg1MGIiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaWF0IjoxNzQyNDQ1NzY5LCJpc3MiOiJ1ZGFwaS1nYXRld2F5LXNlcnZpY2UiLCJleHAiOjE3NDI1MDgwMDB9.N4CfAZ7447_IONS0yyBa-CsM8YTpOc8FNIBcxMik3PY"; // Replace "ACCESS_TOKEN" with your actual token
 
 // Function to authorize the market data feed
 const getMarketFeedUrl = async () => {
-  const url = "https://api.upstox.com/v3/feed/market-data-feed/authorize";
+  const url = "https://api.upstox.com/v2/feed/market-data-feed/authorize";
   const headers = {
     'Accept': 'application/json',
     'Authorization': `Bearer ${accessToken}`
@@ -37,7 +38,7 @@ const connectWebSocket = async (wsUrl) => {
           method: "sub",
           data: {
             mode: "full",
-            instrumentKeys: ["NSE_INDEX|Nifty Bank", "NSE_INDEX|Nifty 50"],
+            instrumentKeys: ["NSE_EQ|INE254N01026"],
           },
         };
         ws.send(Buffer.from(JSON.stringify(data)));
@@ -49,7 +50,12 @@ const connectWebSocket = async (wsUrl) => {
     });
 
     ws.on("message", (data) => {
-      console.log(JSON.stringify(decodeProfobuf(data))); // Decode the protobuf message on receiving it
+      const output = JSON.stringify(decodeProfobuf(data));
+      const currentValue = output.feeds["NSE_EQ|INE254N01026"].fullFeed.marketFF.ltpc 
+      const oneDayValue = output.feeds["NSE_EQ|INE254N01026"].fullFeed.marketFF.marketOHLC.ohlc[0]
+      const orderInput = {currentValue,oneDayValue}
+      const orderStock = buyingAlgo(orderInput)
+      console.log(output); // Decode the protobuf message on receiving it
     });
 
     ws.on("error", (error) => {
@@ -84,6 +90,7 @@ const decodeProfobuf = (buffer) => {
     await initProtobuf(); // Initialize protobuf
     const wsUrl = await getMarketFeedUrl(); // Get the market feed URL
     const ws = await connectWebSocket(wsUrl); // Connect to the WebSocket
+    
   } catch (error) {
     console.error("An error occurred:", error);
   }
